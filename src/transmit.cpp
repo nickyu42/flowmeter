@@ -1,36 +1,37 @@
-#include "radio.h"
-#include "config.h"
-#include "master.h"
+#include "transmit.h"
 
-/**********************************************************************/
+#include "mbed.h"
+#include "radio.h"
+
+#include "config.h"
+
 EventQueue queue(4 * EVENTS_EVENT_SIZE);
 
-void tx_test()
+Thread radioThread;
+
+void transmit(uint8_t *data) {
+    Radio::radio.tx_buf[0] = *data;
+    Radio::Send(1, 0, 0, 0);
+}
+
+void queue_transmit(uint8_t data)
 {
-    static uint8_t seq = 0;
-
-    Radio::radio.tx_buf[0] = seq++;  /* set payload */
-    Radio::Send(1, 0, 0, 0);   /* begin transmission */
-    printf("sent\r\n");
-
-/*    {
-        mbed_stats_cpu_t stats;
-        mbed_stats_cpu_get(&stats);
-        printf("canDeep:%u ", sleep_manager_can_deep_sleep());
-        printf("Uptime: %llu ", stats.uptime / 1000);
-        printf("Sleep time: %llu ", stats.sleep_time / 1000);
-        printf("Deep Sleep: %llu\r\n", stats.deep_sleep_time / 1000);
-    }*/
+    queue.call(callback(transmit, &data));
 }
 
 void txDoneCB()
 {
-    printf("got-tx-done\r\n");
-    queue.call_in(500, tx_test);
 }
 
 void rxDoneCB(uint8_t size, float rssi, float snr)
 {
+    puts("got response: ");
+
+    for (size_t i = 0; i < size; i++) {
+        printf("%c", Radio::radio.rx_buf[i]);
+    }
+
+    puts("\r\n");
 }
 
 
@@ -52,9 +53,8 @@ const RadioEvents_t rev = {
     /* CadDone  */          NULL
 };
 
-void master_main()
-{
-    printf("\r\nreset-tx ");
+void start_LoRa() {
+    printf("init LoRa\r\n");
 
     Radio::Init(&rev);
 
@@ -67,8 +67,7 @@ void master_main()
                // preambleLen, fixLen, crcOn, invIQ
     Radio::LoRaPacketConfig(8, false, true, false);
 
-    queue.call_in(500, tx_test);
-
-    queue.dispatch();
+    radioThread.start([]() {
+        queue.dispatch_forever();
+    });
 }
-

@@ -1,1 +1,0 @@
-void slave_main();
