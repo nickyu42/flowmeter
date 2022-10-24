@@ -5,3 +5,7 @@ sx12xx_hal/
 sx126x/
 .hgignore
 .hg/
+venv/
+INA219/
+.DS_STORE
+.ipynb_checkpoints
