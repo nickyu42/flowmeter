@@ -23,7 +23,7 @@ void read_sensor_task(CurrentSensor *s)
             s->read_power_raw()
         );
 
-        ThisThread::sleep_for(100ms);
+        ThisThread::sleep_for(10ms);
     }
 }
 
