@@ -6,10 +6,13 @@
 
 #include "BUILD/NUCLEO_F446RE/ARMC6/mbed_config.h"
 #include "BufferedSerial.h"
+#include "EventFlags.h"
 #include "PinNameAliases.h"
 #include "ThisThread.h"
 #include "Thread.h"
+#include "Ticker.h"
 #include "mbed.h"
+#include "rtos.h"
 
 #include "src/CharCircularBuffer.h"
 #include "src/CurrentSensor.h"
@@ -19,40 +22,26 @@ using namespace std::chrono;
 
 #define HEARTBREAT_RATE 500ms
 
+#define CURRENT_SENSOR_READ_FLAG (1UL << 0)
+#define POWER_DOWN_FLAG (1UL << 2)
+
 #define CURRENT_SENSOR_BUFFER_SIZE 20
-#define CURRENT_SENSOR_READ_DELAY 500000us
+#define CURRENT_SENSOR_READ_DELAY 250ms
 
-// 4 * int16_t    = 8 bytes
-// 4 comma chars  = 4 bytes
-// 1 double (fr)  = 8 bytes
-// \r\n           = 2 bytes
-#define CURRENT_SENSOR_PACKET_SIZE (4 * 2 + 4 + 8 + 2)
-
+// Voltage level at which the system powers down
 #define CRITICAL_VOLTAGE_mV 7000
 
+EventFlags event_flags;
 
-DigitalOut heartbeat_led(LED1);
-
+// RTOS objects
 Thread read_sensor_thread;
-Ticker read_sensor;
+Ticker read_ticker;
+
+// Current sensor readings
 CharCircularBuffer<CURRENT_SENSOR_BUFFER_SIZE> busvoltage_samples_mV;
 CharCircularBuffer<CURRENT_SENSOR_BUFFER_SIZE> current_samples_raw;
 CharCircularBuffer<CURRENT_SENSOR_BUFFER_SIZE> power_samples;
 float current_flow_rate = 0;
-
-size_t critical_voltage_samples = 0;
-
-BufferedSerial console(USBTX, USBRX, MBED_CONF_PLATFORM_STDIO_BAUD_RATE);
-
-
-uint8_t data_buffer[CURRENT_SENSOR_PACKET_SIZE] = {0};
-
-Timer read_timer;
-
-FileHandle* mbed::mbed_override_console(int)
-{
-    return &console;
-}
 
 double estimate_flowrate(int16_t power_mean) {
   double a = 148.450205494820409057865617796779;
@@ -60,13 +49,15 @@ double estimate_flowrate(int16_t power_mean) {
   return (power_mean - b) / a;
 }
 
-void read_current_task(CurrentSensor *s) {
+void set_read_flag() { event_flags.set(CURRENT_SENSOR_READ_FLAG); }
 
+void read_current_task(CurrentSensor *s) {
   printf("[INFO] Starting read_current task\r\n");
 
+  size_t critical_voltage_samples = 0;
+
   while (true) {
-    read_timer.reset();
-    read_timer.start();
+    event_flags.wait_any(CURRENT_SENSOR_READ_FLAG);
 
     int16_t busvoltage = s->read_bus_voltage_mV();
     int16_t current = s->read_current_raw();
@@ -80,41 +71,14 @@ void read_current_task(CurrentSensor *s) {
     }
 
     if (critical_voltage_samples > 10) {
-      // power_down sequence
+      event_flags.set(POWER_DOWN_FLAG);
     }
 
-    // busvoltage_samples_mV.push(static_cast<int16_t>(busvoltage));
-    // current_samples_raw.push(s->read_current_raw());
     power_samples.push(power);
-
-    // current_flow_rate = ceil(busvoltage_samples_mV.mean()) / 1000;
     current_flow_rate = estimate_flowrate(power_samples.mean());
 
-    // data_buffer[0] = static_cast<uint8_t>(busvoltage & 0xff);
-    // data_buffer[1] = static_cast<uint8_t>((busvoltage >> 8) & 0xff);
-
-    // data_buffer[3] = static_cast<uint8_t>(current & 0xff);
-    // data_buffer[4] = static_cast<uint8_t>((current >> 8) & 0xff);
-
-    // data_buffer[6] = static_cast<uint8_t>(shuntvoltage & 0xff);
-    // data_buffer[7] = static_cast<uint8_t>((shuntvoltage >> 8) & 0xff);
-
-    // data_buffer[9] = static_cast<uint8_t>(power & 0xff);
-    // data_buffer[10] = static_cast<uint8_t>((power >> 8) & 0xff);
-
-    // uint64_t current_flow_rate_uint = static_cast<uint64_t>(current_flow_rate);
-    // for (size_t i = 0; i < 8; i++) {
-    //   data_buffer[12 + i] = static_cast<uint8_t>((current_flow_rate_uint >> (8 * i)) & 0xff);
-    // }
-
-    printf("%d,%d,%d,%d,%f\r\n", busvoltage, current, shuntvoltage, power, current_flow_rate);
-
-    read_timer.stop();
-
-    printf("time taken: %llu us\r\n", duration_cast<microseconds>(read_timer.elapsed_time()).count());
-
-    ThisThread::sleep_for(duration_cast<milliseconds>(
-        CURRENT_SENSOR_READ_DELAY - read_timer.elapsed_time() ));
+    printf("%d,%d,%d,%d,%f\r\n", busvoltage, current, shuntvoltage, power,
+           current_flow_rate);
   }
 }
 
@@ -127,23 +91,14 @@ int main() {
   printf("[ OK ] Done!\r\n");
 
   printf("[INFO] Starting INA219\r\n");
-  //   read_sensor.attach(callback(read_current_task, &current_sensor),
-  //                      CURRENT_SENSOR_READ_DELAY);
   read_sensor_thread.start(callback(read_current_task, &current_sensor));
+  read_ticker.attach(set_read_flag, CURRENT_SENSOR_READ_DELAY);
   printf("[ OK ] Done!\r\n");
 
-  data_buffer[2] = ',';
-  data_buffer[5] = ',';
-  data_buffer[8] = ',';
-  data_buffer[11] = ',';
-  data_buffer[CURRENT_SENSOR_PACKET_SIZE - 2] = '\r';
-  data_buffer[CURRENT_SENSOR_PACKET_SIZE - 1] = '\n';
+  DigitalOut heartbeat_led(LED1);
 
   while (true) {
     ThisThread::sleep_for(HEARTBREAT_RATE);
     heartbeat_led = !heartbeat_led;
-
-    // printf("[INFO] Measured flowrate: %d l/10min\r\n",
-    // static_cast<uint16_t>(current_flow_rate * 10));
   }
 }
