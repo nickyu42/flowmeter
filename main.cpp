@@ -4,15 +4,12 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "BUILD/NUCLEO_F446RE/ARMC6/mbed_config.h"
-#include "BufferedSerial.h"
 #include "EventFlags.h"
 #include "PinNameAliases.h"
 #include "ThisThread.h"
 #include "Thread.h"
 #include "Ticker.h"
 #include "mbed.h"
-#include "rtos.h"
 
 #include "src/CharCircularBuffer.h"
 #include "src/CurrentSensor.h"
@@ -26,7 +23,7 @@ using namespace std::chrono;
 #define POWER_DOWN_FLAG (1UL << 2)
 
 #define CURRENT_SENSOR_BUFFER_SIZE 20
-#define CURRENT_SENSOR_READ_DELAY 250ms
+#define CURRENT_SENSOR_READ_DELAY 10ms
 
 // Voltage level at which the system powers down
 #define CRITICAL_VOLTAGE_mV 7000
@@ -41,7 +38,8 @@ Ticker read_ticker;
 CharCircularBuffer<CURRENT_SENSOR_BUFFER_SIZE> busvoltage_samples_mV;
 CharCircularBuffer<CURRENT_SENSOR_BUFFER_SIZE> current_samples_raw;
 CharCircularBuffer<CURRENT_SENSOR_BUFFER_SIZE> power_samples;
-float current_flow_rate = 0;
+float current_flow_rate = 0; // l/m
+float cumulative_flow = 0;   // l
 
 double estimate_flowrate(int16_t power_mean) {
   double a = 148.450205494820409057865617796779;
@@ -56,6 +54,7 @@ void read_current_task(CurrentSensor *s) {
 
   size_t critical_voltage_samples = 0;
 
+  // Event loop takes about 2100us
   while (true) {
     event_flags.wait_any(CURRENT_SENSOR_READ_FLAG);
 
@@ -64,7 +63,7 @@ void read_current_task(CurrentSensor *s) {
     int16_t shuntvoltage = s->read_shunt_voltage_raw();
     int16_t power = s->read_power_raw();
 
-    if (busvoltage > CRITICAL_VOLTAGE_mV) {
+    if (busvoltage <= CRITICAL_VOLTAGE_mV) {
       critical_voltage_samples++;
     } else if (critical_voltage_samples > 0) {
       critical_voltage_samples--;
@@ -76,9 +75,10 @@ void read_current_task(CurrentSensor *s) {
 
     power_samples.push(power);
     current_flow_rate = estimate_flowrate(power_samples.mean());
+    cumulative_flow += (current_flow_rate / 60 / 1000) * CURRENT_SENSOR_READ_DELAY.count();
 
-    printf("%d,%d,%d,%d,%f\r\n", busvoltage, current, shuntvoltage, power,
-           current_flow_rate);
+    printf("%d,%d,%d,%d,%f,%f\r\n", busvoltage, current, shuntvoltage, power,
+           current_flow_rate, cumulative_flow);
   }
 }
 
