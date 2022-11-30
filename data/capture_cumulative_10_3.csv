@@ -1,12 +1,3 @@
-==================
-[ OK ] Hello World
-[INFO]à==================
-[ OK ] Hello World
-[INFO] Calibrating current sensor
-[ OK ] Done!
-[INFO] Starting INA219
-[ OK ] Done!
-[INFO] Starting read_current task
 3948,720,357,146,5.612690,0.000935
 3908,714,374,149,5.659843,0.001879
 3824,750,375,147,5.713734,0.002831
