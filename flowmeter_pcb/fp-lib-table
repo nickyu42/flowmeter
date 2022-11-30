@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name "ZED logo")(type "KiCad")(uri "/Users/nick/uni/iot/flowmeter")(options "")(descr ""))
+)
