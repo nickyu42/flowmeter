@@ -16,15 +16,15 @@ This project was done as part of the Advanced Practical IoT and Seminar course g
 
 This project is split up into different components:
 
-- `pcb`
+- `pcb`  
     KiCAD files for the prototype
-- `analysis.ipynb`
+- `analysis.ipynb`  
     Notebook containing all plots and analysis from the dataset in `data`
 - `gateway`
   - Firmware for the receiver ESP32
   - UART-to-MQTT script, parses the serial data from the receiver ESP and publishes that to a MQTT server
   - All code for the web dashboard for tracking water usage
-- `stm32f4_firmware`
+- `stm32f4_firmware`  
   Code for the testing setup with a STM32, based around [MBed OS](https://os.mbed.com/mbed-os/).
-- `esp32_firmware`
+- `esp32_firmware`  
   ESP32 firmware for the prototype, transmits the estimated water flow rate and power metrics via ESP-NOW to the receiver. Built using [FreeRTOS](https://www.freertos.org/) and [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/index.html).
