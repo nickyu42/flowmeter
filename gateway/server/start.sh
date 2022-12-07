@@ -1,6 +1,6 @@
 #!/bin/sh
 
-python -m webbrowser -t "file://$(pwd)/index.html"
+python3 -m webbrowser -t "file://$(pwd)/index.html"
 
 if [[ ${OSTYPE//[0-9.]/} = "darwin" ]] 
 then
@@ -12,3 +12,5 @@ else
     echo "===== IP_ADDRESS: $IP ====="
     mosquitto -c mosquitto.conf
 fi
+
+# python3 ./bridge.py

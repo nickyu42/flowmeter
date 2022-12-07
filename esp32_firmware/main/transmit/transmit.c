@@ -9,6 +9,10 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "driver/gpio.h"
+
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 #include "../flow_estimation/messages.h"
 
@@ -42,6 +46,10 @@ static void msg_send_callback(const uint8_t *mac, esp_now_send_status_t sendStat
 
 static esp_err_t init(void)
 {
+    // HACK: Disable brownout detector
+    uint32_t brown_reg_temp = READ_PERI_REG(RTC_CNTL_BROWN_OUT_REG);
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
     // Initialize NVS, necessary for Wifi
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -56,31 +64,37 @@ static esp_err_t init(void)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_ERROR_CHECK(esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE));
+    // ESP_ERROR_CHECK(esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE));
+
+    // Disable brownout detector
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, brown_reg_temp);
 
     // Initialize espnow
-    ESP_ERROR_CHECK(esp_now_init());
+    // ESP_ERROR_CHECK(esp_now_init());
 
     // Add peer
-    esp_now_peer_info_t peer_info;
-    peer_info.channel = WIFI_CHANNEL;
-    peer_info.ifidx = ESP_IF_WIFI_STA;
-    peer_info.encrypt = false;
-    memcpy(peer_info.peer_addr, broadcast_mac, 6);
-    ESP_ERROR_CHECK(esp_now_add_peer(&peer_info));
+    // esp_now_peer_info_t peer_info;
+    // peer_info.channel = WIFI_CHANNEL;
+    // peer_info.ifidx = ESP_IF_WIFI_STA;
+    // peer_info.encrypt = false;
+    // memcpy(peer_info.peer_addr, broadcast_mac, 6);
+    // ESP_ERROR_CHECK(esp_now_add_peer(&peer_info));
 
-    // Register received message callback
-    ESP_ERROR_CHECK(esp_now_register_recv_cb(msg_receive_callback));
-    ESP_ERROR_CHECK(esp_now_register_send_cb(msg_send_callback));
+    // // Register received message callback
+    // ESP_ERROR_CHECK(esp_now_register_recv_cb(msg_receive_callback));
+    // ESP_ERROR_CHECK(esp_now_register_send_cb(msg_send_callback));
 
     return ESP_OK;
 }
 
 void TransmitDataTask(void *pvParameters)
 {
+    // 
+    // vTaskDelay(100 / portTICK_PERIOD_MS);
+
     ESP_LOGI(TAG, "Starting TransmitDataTask()");
 
     ESP_LOGI(TAG, "Init wifi");
@@ -89,8 +103,13 @@ void TransmitDataTask(void *pvParameters)
     uint8_t received_msg[MEASUREMENTS_MESSAGE_SIZE];
     size_t received_bytes;
 
+    uint8_t led = 0;
     for (;;)
     {
+        gpio_set_level(2, led);
+        led = !led;
+
+
         received_bytes = xMessageBufferReceive(
             measurements_msg_buffer,
             received_msg,
@@ -99,8 +118,8 @@ void TransmitDataTask(void *pvParameters)
 
         configASSERT(received_bytes == MEASUREMENTS_MESSAGE_SIZE);
 
-        esp_err_t status = esp_now_send(broadcast_mac, received_msg, MEASUREMENTS_MESSAGE_SIZE);
-        ESP_ERROR_CHECK(status);
+        // esp_err_t status = esp_now_send(broadcast_mac, received_msg, MEASUREMENTS_MESSAGE_SIZE);
+        // ESP_ERROR_CHECK(status);
     }
 
     vTaskDelete(NULL);

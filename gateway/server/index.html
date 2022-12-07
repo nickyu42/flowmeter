@@ -2,15 +2,156 @@
 <html>
 
 <head>
-    <title>Localizationstation</title>
+    <title>Water Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.7/dist/uPlot.min.css">
+    <style>
+        th {
+            border: none !important
+        }
+
+        #drop {
+            margin-top: 20px;
+            padding: 0;
+            /* background-color: rgb(100, 204, 253); */
+            border-style: solid;
+            border-color: rgb(100, 204, 253);
+            box-shadow: 0 12px 15px 0 rgba(182, 182, 182, 0.44);
+            /* margin: 0 auto; */
+            width: 180px;
+            height: 180px;
+            border-radius: 0% 100% 100% 100%;
+            -webkit-transform: rotate(45deg);
+            transform: rotate(45deg);
+            clear: left;
+        }
+
+        #drop-content {
+            -webkit-transform: rotate(-45deg);
+            transform: rotate(-45deg);
+        }
+
+        #droplet {
+            width: 20%;
+            margin: 0 auto;
+        }
+
+        .overlay {
+            display: block;
+            width: 100%;
+            height: 80%;
+            position: absolute;
+            top:20%;
+            left:0;
+            z-index:0;
+            color:rgb(0, 0, 0);
+            overflow:hidden;
+        }
+
+        .overlay-object {
+            display: inline-block;
+            width:100%;
+            text-align:center;
+            vertical-align:middle;
+            overflow:hidden;
+            margin: 0 auto;
+            position: relative;
+            top: 50%;
+            -webkit-transform: translateY(-50%);
+            transform: translateY(-50%);
+        }
+    </style>
 </head>
 
 <body>
-    <div style="display: flex; justify-content: flex-start">
-        <p>Connection status:&nbsp;</p>
-        <p id="status"></p>
-    </div>
+    <section class="section">
+        <div class="container">
+            <h1 class="title">
+                Water Monitor
+            </h1>
+
+            <div class="block">
+                <h6 style="float: left;">Server status:&nbsp;</h6>
+                <h6 id="status" style="color: red;">offline</h6>
+            </div>
+
+            <div class="columns">
+                <div class="column">
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title">
+                                Water Status <small class="has-text-grey">&nbsp;(shower)</small>
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="content">
+                                <div class="level">
+                                    <div class="level-item">
+                                        <svg width="200px"
+                                            height="200px" viewBox="0 0 470.34 470.34"
+                                            style="enable-background:new 0 0 470.34 470.34;">
+                                            <g>
+                                                <path fill="rgb(100, 204, 253)" d="M235.169,470.34c99.262,0,180.016-80.756,180.016-180.018c0-41.055-28.979-101.928-86.129-180.933
+                C287.262,51.617,244.866,4.585,244.442,4.117C242.072,1.496,238.705,0,235.17,0c-3.534,0-6.903,1.496-9.273,4.117
+                c-0.423,0.469-42.819,47.5-84.613,105.272c-57.152,79.004-86.13,139.878-86.13,180.933
+                C55.152,389.584,135.907,470.34,235.169,470.34z M161.41,124.223c29.423-40.688,59.156-75.953,73.761-92.8
+                c14.578,16.813,44.227,51.977,73.628,92.621c53.244,73.6,81.387,131.099,81.387,166.278c0,85.477-69.541,155.018-155.017,155.018
+                c-85.477,0-155.017-69.541-155.017-155.018C80.152,255.173,108.251,197.736,161.41,124.223z" />
+                                            </g>  
+                                        </svg>
+                                    <div class="overlay">
+                                        <div class="overlay-object">
+                                            <h2 id="current-flowrate-counter">0</h2>
+                                            <h6 class="has-text-grey">liters/min</h6>
+                                        </div>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column">
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title">
+                                Today
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="content">
+                                <div style="height: 200px;">
+                                    <div class="overlay">
+                                        <div class="overlay-object">
+                                            <h1 class="is-size-1" id="total-consumption-counter">0</h1>
+                                            <h6 class="has-text-grey">liters</h6>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <header class="card-header">
+                    <p class="card-header-title">
+                        Last 24 hours
+                    </p>
+                </header>
+                <div class="card-content">
+                    <div class="content">
+                        <div id="24-hours-plot"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.7/dist/uPlot.iife.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <script src="script.js"></script>
 </body>
